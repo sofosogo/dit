@@ -1,5 +1,7 @@
 ﻿$(document).ready(function() {
 
+var _img_src = "http://bing.com/s/wlflag.ico";
+
 module("common.Dit");
 var basic = '<div class="{class}_title" jid="${class}0{class}{width}" style="width: {width}, height:{height}"><div>{name}{name}</div></div>';
 test("create-simple", function(){
@@ -16,30 +18,30 @@ var jquery = '<div><div>name: {name}, avatar: ${img}, friends: ${friends}</div><
 test("create-jquery", function(){
     var temp = Dit.create( jquery );
     var $temp = $(temp);
-    temp.fill( {"name": "sofosogo", "img": $("<img>", {src: "http://g.cn/t.png"}), friends: $("<span>", {text: "ivy"})} );
-    same( $temp.find("img").attr("src"), "http://g.cn/t.png" );
+    temp.fill( {"name": "sofosogo", "img": $("<img>", {src: _img_src}), friends: $("<span>", {text: "ivy"})} );
+    same( $temp.find("img").attr("src"), _img_src );
     same( $temp.find("span").html(), "ivy" );
-    sameIgnoreCase( $temp.html(), '<div>name: sofosogo, avatar: <img src="http://g.cn/t.png">, friends: <span>ivy</span></div>' );
+    sameIgnoreCase( $temp.html(), '<div>name: sofosogo, avatar: <img src="http://bing.com/s/wlflag.ico">, friends: <span>ivy</span></div>' );
 });
 
 var subAttr = '<div><div>name: {user.name.first} {user.name.last}</div>avatar: ${user.img}</div>';
 test("create-sub-attr", function(){
     var temp = Dit.create( subAttr );
     var $temp = $(temp);
-    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: "http://g.cn/t.png"}) }} );
+    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
     same( $temp.find("div").html(), "name: sofo sogo" );
-    same( $temp.find("img").attr("src"), "http://g.cn/t.png" );
+    same( $temp.find("img").attr("src"), _img_src );
 });
 
 var bind = '<div bind="user"><div jid="{first}{last}" bind="name">name: {first} {last}</div>avatar: ${img}</div>';
 test("create-bind", function(){
     var temp = Dit.create( bind );
     var $temp = $(temp);
-    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: "http://g.cn/t.png"}) }} );
+    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
     same( $temp.find("div").html(), "name: sofo sogo" );
-    same( $temp.find("img").attr("src"), "http://g.cn/t.png" );
+    same( $temp.find("img").attr("src"), _img_src );
     same( $temp.find("div").attr("jid"), "sofosogo" );
-    sameIgnoreCase( $temp.html(), '<div jid="sofosogo">name: sofo sogo</div>avatar: <img src="http://g.cn/t.png">' );
+    sameIgnoreCase( $temp.html(), '<div jid="sofosogo">name: sofo sogo</div>avatar: <img src="http://bing.com/s/wlflag.ico">' );
 });
 
 var array = '<div bind="user">{0.friends.0}, {0.friends.1}, {1.friends.0}, {1.friends.1}</div>';
@@ -53,7 +55,7 @@ test("create-array", function(){
 test("clean", function(){
     var temp = Dit.create( bind );
     var $temp = $(temp);
-    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: "http://g.cn/t.png"}) }} );
+    temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
     same( $temp.find("div").html(), "name: sofo sogo" );
     same( $temp.find("div").attr("jid"), "sofosogo" );
     temp.fill( {user: {"name": {last: "lee", first: "ivy"}}} );
@@ -84,17 +86,17 @@ test("for loop", function(){
         users: [{
             id: 1,
             name: "Zhang San",
-            avatar: "/images/zhangsan.png",
+            avatar: _img_src,
             friends: ["A", "B"]
         },{
             id: 2,
             name: "Li Si",
-            avatar: "/images/lisi.png",
+            avatar: _img_src,
             friends: []
         },{
             id: 3,
             name: "Wang Wu",
-            avatar: "/images/wangwu.png",
+            avatar: _img_src,
             friends: ["C"]
         }]
     };
@@ -147,6 +149,52 @@ test("opt", function(){
     });
     temp.fill( user );
     sameIgnoreCase( temp.innerHTML.replace(/\s*/g, ""), "<div>姓名：张三</div><div>性别：男</div><div>年龄：26</div>" );
+});
+
+
+module("common.Form");
+test("create-form", function(){
+    $.get("form-sample.html", function( html ){
+        var user = { 
+            name: "sofosogo",
+            gender: 0,
+            age: 24,
+            desc:"SE",
+            details:{
+                language: ["English", "Chinese"],
+                school: "HFUT",
+                sports: ["Basketball", "PingPong"]
+            },
+            confirmed: 1
+        };
+        
+        var temp = Dit.create( html );
+        temp.fill( user );
+        var fetched = temp.fetch();
+        same( fetched.name, "sofosogo" );
+        same( fetched.gender, 0 );
+        same( fetched.age, 24 );
+        same( fetched.desc, "SE" );
+        same( fetched.details.language.length, 2 );
+        same( fetched.details.school, "HFUT" );
+        same( fetched.details.sports.length, 2 );
+        same( fetched.confirmed, 1 );
+        
+        fetched = temp.clean().fetch();
+        same( fetched.name, "" );
+        same( fetched.gender, void 0 );
+        same( fetched.age, void 0 );
+        same( fetched.desc, "" );
+        same( fetched.details.language.length, 0 );
+        same( fetched.details.gender, void 0 );
+        same( fetched.details.school, "" );
+        same( fetched.details.sports.length, 0 );
+        same( fetched.confirmed, void 0 );
+        
+        start();
+    }, "text");
+    
+    stop();
 });
 
 function sameIgnoreCase( str1, str2 ){
