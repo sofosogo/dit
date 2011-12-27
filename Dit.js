@@ -3,10 +3,11 @@
 var Dit = window.Dit = {
     create: function( node, opt ){
         node = parseNode( node );
-        var phs = {};
-        scan( node, phs, [] );
+        var phs = {},
+            fields = {};
+        scan( node, phs, fields, [] );
         node.fill = function( data ){
-            fill( phs, data, opt );
+            fill( phs, fields, data, opt );
             return node;
         };
         node.clean = function(){
@@ -15,6 +16,9 @@ var Dit = window.Dit = {
         };
         node.clone = function(){
             return Dit.create( node.cloneNode(true), opt );
+        };
+        node.fetch = function(){
+            return fetch( fields );
         }
         return node;
     }
@@ -31,7 +35,7 @@ function parseNode( node ){
     return node;
 }
 
-function fill( phs, data, fns ){
+function fill( phs, fields, data, fns ){
     var val, handlers;
     for( var field in phs ){
         val = evaluate( data, field );
@@ -45,6 +49,7 @@ function fill( phs, data, fns ){
             handlers[i].fill( val || "" + val );
         }
     }
+    
 }
 
 function clean( phs ){
@@ -57,7 +62,16 @@ function clean( phs ){
         }
     }
 }
-function scan( node, phs, prefix ){
+
+function fetch( fields ){
+    var data = {};
+    for( var k in fields ){
+        assemble( data, k, fields[k].fetch() );
+    }
+    return data;
+}
+
+function scan( node, phs, fields, prefix ){
     if( node.nodeType === 3 ) return scanText( node, phs, prefix );
     if( node.nodeType !== 1 ) return ;
     if( node.getAttribute("bind") ){
@@ -65,6 +79,7 @@ function scan( node, phs, prefix ){
         node.removeAttribute("bind");
     }
     scanAttr( node, phs, prefix );
+    isFormField( node ) && scanFormField( node, phs, fields, prefix );
     if( node.getAttribute("each") ){
         var children = [];
         while( node.hasChildNodes() ){
@@ -93,10 +108,10 @@ function scan( node, phs, prefix ){
             node: node
         };
         getHandlers(phs, prefix).push( handler );
-        node.removeAttribute("each");
         return;
     }
-    var children = []; // node.childNodes changed
+    // node.childNodes changed by scanText function.
+    var children = []; 
     for( var i = 0; i < node.childNodes.length; i++ ){
         children.push( node.childNodes[i] );
     }
@@ -104,7 +119,7 @@ function scan( node, phs, prefix ){
     for( var i = 0; i < children.length; i++ ){
         child = children[i];
         if( child.nodeType === 1 ){
-            scan( child, phs, prefix );
+            scan( child, phs, fields, prefix );
         }else if( child.nodeType === 3 ){
             scanText( child, phs, prefix );
         }
@@ -173,8 +188,157 @@ function scanText( node, phs, prefix ){
     parent.removeChild( node );
 }
 
+function scanFormField( node, phs, fields, prefix ){
+    var name = node.name,
+        type = node.type,
+        isNum = node.getAttribute("number"),
+        key = getField( prefix, name ),
+        handler = fields[key];
+    if( !handler ){
+         handler = fields[key] = {};
+         getHandlers( phs, key ).push( handler );
+    }
+    handler.isNum = handler.isNum || type === "number" || type ==="range" || isNum !== null;
+    
+    if( type === "radio" || type === "checkbox" ){
+        if( !handler.nodes ) handler.nodes = [];
+        handler.nodes.push( node );
+    }else{
+        handler.nodes = node;
+    }
+    if( !handler.fill ) copy( handler, prototype[type] || prototype.normal);
+}
+
+var prototype = {};
+prototype.normal = {
+    fill: function( val ){
+        this.nodes.value = val || "";
+    },
+    clean: function(){
+        this.nodes.value = "";
+    },
+    fetch: function(){
+        return toNumber(this.nodes.value, this.isNum);
+    }
+}
+prototype.radio = {
+    fill: function( val ){
+        var nodes = this.nodes,
+            len = nodes.length;
+        for( var i = 0; i < len; i++ ){
+            nodes[i].checked = false;
+            if( nodes[i].value === "" + val ){
+                nodes[i].checked = true;
+            }
+        }
+    },
+    clean: function(){
+        var nodes = this.nodes,
+            len = nodes.length;
+        for( var i = 0; i < len; i++ ){
+            nodes[i].checked = false;
+        }
+    },
+    fetch: function(){
+        var nodes = this.nodes,
+            len = nodes.length;
+        for( var i = 0; i < len; i++ ){
+            if( nodes[i].checked ){
+                return toNumber(nodes[i].value, this.isNum);
+            }
+        }
+    }
+}
+
+prototype.checkbox = {
+    fill: function( val ){
+        var nodes = this.nodes,
+            len = nodes.length;
+        !isArray( val ) && ( val = [val] );
+        for( var i = 0; i < len; i++ ){
+            nodes[i].checked = false;
+            for( var j = 0; val && j < val.length; j++ ){
+                if( nodes[i].value === "" + val[j] ) nodes[i].checked = true;
+            }
+        }
+    },
+    clean: function(){
+        var nodes = this.nodes,
+            len = nodes.length;
+        for( var i = 0; i < len; i++ ){
+            nodes[i].checked = false;
+        }
+    },
+    fetch: function(){
+        var nodes = this.nodes,
+            len = nodes.length;
+        var arr = [];
+        for( var i = 0; i < len; i++ ){
+            if( nodes[i].checked ){
+                arr.push( toNumber(nodes[i].value, this.isNum) );
+            }
+        }
+        if( len === 1 ) return arr[0];
+        return arr;
+    }
+}
+
+prototype["select-multiple"] = {
+    fill: function( val ){
+        var options = this.nodes.childNodes,
+            len = options.length;
+        for( var i = 0; i < len; i++ ){
+            if( options[i].nodeType !== 1 ) continue;
+            options[i].setAttribute("selected", "");
+            options[i].selected = false;
+            for( var j = 0; val && j < val.length; j++ ){
+                if( options[i].nodeType === 1 && options[i].value === val[j] ) {
+                    options[i].setAttribute("selected", "true"); // IE
+                    options[i].selected = true; // FF and other
+                }
+            }
+        }
+    },
+    clean: function(){
+        var options = this.nodes.childNodes,
+            len = options.length;
+        for( var i = 0; i < len; i++ ){
+            if( options[i].nodeType === 1 ){
+                options[i].setAttribute("selected", ""); // IE
+                options[i].selected = false; // FF and other
+            }
+        }
+    },
+    fetch: function(){
+        var options = this.nodes.childNodes,
+            len = options.length,
+            arr = [];
+        for( var i = 0; i < len; i++ ){
+            if( options[i].nodeType === 1 && options[i].selected ){
+                val = options[i].value;
+                arr.push( toNumber(options[i].value, this.isNum) );
+            }
+        }
+        return arr;
+    }
+}
+
+function toNumber( val, isNum ){
+    isNum && ( val = parseInt(val) );
+    return val !== val ? void 0 : val; // val !== val <==> typeof val === "number" && isNaN(val)
+}
+
+function isFormField( node ){
+    var tagName = node.tagName.toLowerCase();
+    if( tagName === "input" || tagName === "textarea" || tagName === "select" ){
+        var type = node.type;
+        return type !== "image" && type !== "file" && type !== "button" && type !== "reset" && type !== "submit";
+    }
+    return false;
+}
+
 function getField( prefix, field ){
-    prefix = prefix && prefix.length > 0 ? prefix.join(".") : null;
+    isArray( prefix ) && ( prefix = prefix.join(".") );
     return prefix && field ? (prefix + "." + field) : (prefix || field);
 }
 
@@ -188,6 +352,16 @@ function textNode( text ){
     return document.createTextNode("" + text);
 }
 
+function copy( target, source ){
+    for( var k in source ){
+        target[k] = source[k];
+    }
+}
+
+function isArray( obj ){
+    return obj && Object.prototype.toString.call(obj) === "[object Array]";
+}
+
 function evaluate( ctx, exp ){
     if( !ctx || !exp ) return null;
     var fs = exp.split("."),
@@ -197,4 +371,19 @@ function evaluate( ctx, exp ){
     }
     return data;
 }
+
+function assemble( data, field, val ){
+    if( !data || !field ) return null;
+    var fs = field.split(".");
+    var temp = data,
+        len = fs.length;
+    for( var i = 0; i < len - 1; i++ ){
+        if( !fs[i] ) continue;
+        temp[ fs[i] ] = temp[ fs[i] ] || {};
+        temp = temp[ fs[i] ];
+    }
+    temp[ fs[len-1] ] = val;
+    return data;
+}
+
 })();
