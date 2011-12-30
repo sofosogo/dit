@@ -3,14 +3,14 @@
 var _img_src = "http://bing.com/s/wlflag.ico";
 
 module("common.Dit");
-var basic = '<div class="{class}_title" jid="${class}0{class}{width}" style="width: {width}, height:{height}"><div>{name}{name}</div></div>';
+var basic = '<div class="{class}_title" jid="${class}0{class}{width}" style="width: {width}, height:{height}"><div>{name} {name}</div></div>';
 test("create-simple", function(){
     var temp = Dit.create( basic );
     var $temp = $(temp);
     temp.fill( {"class": "red", "name":"sofosogo", width: 30, height: 40} );
 
     ok( $temp.is(".red_title") );
-    sameIgnoreCase( $temp.html(), "<div>sofosogosofosogo</div>" );
+    sameIgnoreCase( $temp.html(), "<div>sofosogo sofosogo</div>" );
     same( $temp.attr("jid"), "red0red30" );
 });
 
