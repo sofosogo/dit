@@ -22,10 +22,11 @@ var Dit = window.Dit = {
         }
         return node;
     }
-};
-
-var container = document.createElement("body");
-var regex = /(\$?)\{([\w\d\.]*)\}/ig;
+},
+    toString = Object.prototype.toString,
+    container = document.createElement("body"),
+    regex = /(\$?)\{([\w\d\.]*)\}/ig,
+    protos = {};
 
 function parseNode( node ){
     if( typeof node === "string" ){
@@ -195,7 +196,7 @@ function scanFormField( node, phs, fields, prefix ){
         key = getField( prefix, name ),
         handler = fields[key];
     if( !handler ){
-         handler = fields[key] = {};
+         handler = fields[key] = new (protos[type] || protos.normal)();
          getHandlers( phs, key ).push( handler );
     }
     handler.isNum = handler.isNum || type === "number" || type ==="range" || isNum !== null;
@@ -206,11 +207,10 @@ function scanFormField( node, phs, fields, prefix ){
     }else{
         handler.nodes = node;
     }
-    if( !handler.fill ) copy( handler, prototype[type] || prototype.normal);
 }
 
-var prototype = {};
-prototype.normal = {
+protos.normal = function(){};
+protos.normal.prototype = {
     fill: function( val ){
         this.nodes.value = val || "";
     },
@@ -221,7 +221,8 @@ prototype.normal = {
         return toNumber(this.nodes.value, this.isNum);
     }
 }
-prototype.radio = {
+protos.radio = function(){};
+protos.radio.prototype = {
     fill: function( val ){
         var nodes = this.nodes,
             len = nodes.length;
@@ -249,8 +250,8 @@ prototype.radio = {
         }
     }
 }
-
-prototype.checkbox = {
+protos.checkbox = function(){};
+protos.checkbox.prototype = {
     fill: function( val ){
         var nodes = this.nodes,
             len = nodes.length;
@@ -282,8 +283,8 @@ prototype.checkbox = {
         return arr;
     }
 }
-
-prototype["select-multiple"] = {
+protos["select-multiple"] = function(){};
+protos["select-multiple"].prototype = {
     fill: function( val ){
         var options = this.nodes.childNodes,
             len = options.length;
@@ -352,14 +353,8 @@ function textNode( text ){
     return document.createTextNode("" + text);
 }
 
-function copy( target, source ){
-    for( var k in source ){
-        target[k] = source[k];
-    }
-}
-
 function isArray( obj ){
-    return obj && Object.prototype.toString.call(obj) === "[object Array]";
+    return obj && toString.call(obj) === "[object Array]";
 }
 
 function evaluate( ctx, exp ){
