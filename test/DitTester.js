@@ -1,86 +1,84 @@
-﻿$(document).ready(function() {
+﻿$(function() {
 
 var _img_src = "http://bing.com/s/wlflag.ico";
 
-module("common.Dit");
-var basic = '<div class="{class}_title" jid="${class}0{class}{width}" style="width: {width}, height:{height}"><div>{name} {name}</div></div>';
+module("common.dit");
+var basic = '<div class="{{class}}_title" jid="${{class}}0{{class}}{{width}}" style="width: {{width}}, height:{{height}}"><div>{{name}} {{name}}</div></div>';
 test("create-simple", function(){
-    var temp = Dit.create( basic );
+    var temp = dit.create( basic );
     var $temp = $(temp);
     temp.fill( {"class": "red", "name":"sofosogo", width: 30, height: 40} );
 
     ok( $temp.is(".red_title") );
     sameIgnoreCase( $temp.html(), "<div>sofosogo sofosogo</div>" );
-    same( $temp.attr("jid"), "red0red30" );
+    deepEqual( $temp.attr("jid"), "red0red30" );
 });
 
-var jquery = '<div><div>name: {name}, avatar: ${img}, friends: ${friends}</div></div>';
+var jquery = '<div><div>name: {{name}}, avatar: ${{img}}, friends: ${{friends}}</div></div>';
 test("create-jquery", function(){
-    var temp = Dit.create( jquery );
+    var temp = dit.create( jquery );
     var $temp = $(temp);
     temp.fill( {"name": "sofosogo", "img": $("<img>", {src: _img_src}), friends: $("<span>", {text: "ivy"})} );
-    same( $temp.find("img").attr("src"), _img_src );
-    same( $temp.find("span").html(), "ivy" );
-    sameIgnoreCase( $temp.html(), '<div>name: sofosogo, avatar: <img src="http://bing.com/s/wlflag.ico">, friends: <span>ivy</span></div>' );
+    deepEqual( $temp.find("img").attr("src"), _img_src );
+    deepEqual( $temp.find("span").html(), "ivy" );
 });
 
-var subAttr = '<div><div>name: {user.name.first} {user.name.last}</div>avatar: ${user.img}</div>';
+var subAttr = '<div><div>name: {{user.name.first}} {{user.name.last}}</div>avatar: ${{user.img}}</div>';
 test("create-sub-attr", function(){
-    var temp = Dit.create( subAttr );
+    var temp = dit.create( subAttr );
     var $temp = $(temp);
     temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
-    same( $temp.find("div").html(), "name: sofo sogo" );
-    same( $temp.find("img").attr("src"), _img_src );
+    deepEqual( $temp.find("div").html(), "name: sofo sogo" );
+    deepEqual( $temp.find("img").attr("src"), _img_src );
 });
 
-var bind = '<div bind="user"><div jid="{first}{last}" bind="name">name: {first} {last}</div>avatar: ${img}</div>';
+var bind = '<div bind="user"><div jid="{{first}}{{last}}" bind="name">name: {{first}} {{last}}</div>avatar: ${{img}}</div>';
 test("create-bind", function(){
-    var temp = Dit.create( bind );
+    var temp = dit.create( bind );
     var $temp = $(temp);
     temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
-    same( $temp.find("div").html(), "name: sofo sogo" );
-    same( $temp.find("img").attr("src"), _img_src );
-    same( $temp.find("div").attr("jid"), "sofosogo" );
-    sameIgnoreCase( $temp.html(), '<div jid="sofosogo">name: sofo sogo</div>avatar: <img src="http://bing.com/s/wlflag.ico">' );
+    deepEqual( $temp.find("div").html(), "name: sofo sogo" );
+    deepEqual( $temp.find("img").attr("src"), _img_src );
+    deepEqual( $temp.find("div").attr("jid"), "sofosogo" );
 });
 
-var array = '<div bind="user">{0.friends.0}, {0.friends.1}, {1.friends.0}, {1.friends.1}</div>';
+var array = '<div bind="user">{{0.friends.0}}, {{0.friends.1}}, {{1.friends.0}}, {{1.friends.1}}</div>';
 test("create-array", function(){
-    var temp = Dit.create( array );
+    var temp = dit.create( array );
     var $temp = $(temp);
     temp.fill( {user: [{friends: ["A", "B"]}, {friends: {"0": "C", "1": "D"}}]} );
-    same( $temp.html(), "A, B, C, D" );
+    deepEqual( $temp.html(), "A, B, C, D" );
 });
 
 test("clean", function(){
-    var temp = Dit.create( bind );
+    var temp = dit.create( bind );
     var $temp = $(temp);
     temp.fill( {user: {"name": {last: "sogo", first: "sofo"}, "img": $("<img>", {src: _img_src}) }} );
-    same( $temp.find("div").html(), "name: sofo sogo" );
-    same( $temp.find("div").attr("jid"), "sofosogo" );
+    deepEqual( $temp.find("div").html(), "name: sofo sogo" );
+    deepEqual( $temp.find("div").attr("jid"), "sofosogo" );
     temp.fill( {user: {"name": {last: "lee", first: "ivy"}}} );
-    same( $temp.find("div").html(), "name: ivy lee" );
-    same( $temp.find("div").attr("jid"), "ivylee" );
+    deepEqual( $temp.find("div").html(), "name: ivy lee" );
+    deepEqual( $temp.find("div").attr("jid"), "ivylee" );
     temp.clean();
-    same( $temp.find("div").html(), "name:  " );
+    deepEqual( $temp.find("div").html(), "name:  " );
 });
 
 var forLoop = 
 '<div class=".container">"' +
 '    <ol each="u" bind="users">' + 
-'        <li jid="{id}">' +
-'            Name: {name}' +
-'            <img src="{avatar}"/>' +  
+'        <li jid="{{id}}">' +
+'            Name: {{name}}' +
+'            <img imgsrc="{{avatar}}"/>' +  
 '            Friends: <ol each="f" bind="friends">' +
-'                <li class="even" fid="{.}">#<a>{.}</a>#</li>' + 
-'                <li class="odd" fid="{.}">#<a>{.}</a>#</li>' + 
+'                <li class="even" fid="{{.}}">#<a>{{.}}</a>#</li>' + 
+'                <li class="odd" fid="{{.}}">#<a>{{.}}</a>#</li>' + 
 '                no friend.'+
 '            </ol>' + 
 '        </li>' +
 '    </ol>' + 
 '</div>';
 test("for loop", function(){
-    var temp = Dit.create( forLoop );
+    var temp = dit.create( forLoop );
     var $temp = $(temp);
     var data = {
         users: [{
@@ -102,13 +100,13 @@ test("for loop", function(){
     };
     temp.fill( data );
     //console.log( $temp.html() );
-    same( $temp.find("li[jid]").length, 3);
-    same( $temp.find("li[fid]").length, 3);
-    same( $temp.find("li[class=even]").length, 2);
-    same( $temp.find("li[class=odd]").length, 1);
+    deepEqual( $temp.find("li[jid]").length, 3);
+    deepEqual( $temp.find("li[fid]").length, 3);
+    deepEqual( $temp.find("li[class=even]").length, 2);
+    deepEqual( $temp.find("li[class=odd]").length, 1);
     
     var loop = '<ol each="arch" bind="archievements"></ol>';
-    temp = Dit.create( loop, {
+    temp = dit.create( loop, {
         archievements: function( archs, data ){
             var fragment = document.createDocumentFragment();
             for( var i = 0; i < archs.length; i++ ){
@@ -119,25 +117,25 @@ test("for loop", function(){
         }
     });
     temp.fill( {archievements: ["A", "B", "C"]} );
-    same( 3, temp.childNodes.length );
+    deepEqual( 3, temp.childNodes.length );
     temp.fill( {archievements: []} );
-    same( 1, temp.childNodes.length );
+    deepEqual( 1, temp.childNodes.length );
 });
 
 test("clone", function(){
-    var temp = Dit.create("<div><div>{name}</div></div>");
+    var temp = dit.create("<div><div>{{name}} name</div></div>");
     var clone = temp.clone();
     temp.fill( {name: "temp"} );
     clone.fill( {name: "clone"} );
-    sameIgnoreCase("<div>temp</div>", temp.innerHTML);
-    sameIgnoreCase("<div>clone</div>", clone.innerHTML);
+    sameIgnoreCase("<div>temp name</div>", temp.innerHTML);
+    sameIgnoreCase("<div>clone name</div>", clone.innerHTML);
 });
 
 test("opt", function(){
     var genders = { "m": "男", "f": "女" };
     var user = { "lastName": "张", "firstName": "三", "gender": "m", "age": 26 };
-    var string = "<div><div>{labelName}：{name}</div><div>{labelGender}：{gender}</div><div>年龄：{age}</div></div>";
-    var temp = Dit.create(string, {
+    var string = "<div><div>{{labelName}}：{{name}}</div><div>{{labelGender}}：{{gender}}</div><div>年龄：{{age}}</div></div>";
+    var temp = dit.create(string, {
         "gender": function( val ){
             return genders[val] || "未知";
         },
@@ -154,6 +152,7 @@ test("opt", function(){
 
 module("common.Form");
 test("create-form", function(){
+	stop();
     $.get("form-sample.html", function( html ){
         var user = { 
             name: "sofosogo",
@@ -168,37 +167,38 @@ test("create-form", function(){
             confirmed: 1
         };
         
-        var temp = Dit.create( html );
+        var temp = dit.create( html );
         temp.fill( user );
         var fetched = temp.fetch();
-        same( fetched.name, "sofosogo" );
-        same( fetched.gender, 0 );
-        same( fetched.age, 24 );
-        same( fetched.desc, "SE" );
-        same( fetched.details.language.length, 2 );
-        same( fetched.details.school, "HFUT" );
-        same( fetched.details.sports.length, 2 );
-        same( fetched.confirmed, 1 );
+        if( window.console && window.JSON ){
+        	console.log( JSON.stringify(fetched) );
+        }
+        deepEqual( fetched.name, "sofosogo" );
+        deepEqual( fetched.gender, 0 );
+        deepEqual( fetched.age, 24 );
+        deepEqual( fetched.desc, "SE" );
+        deepEqual( fetched.details.language.length, 2 );
+        deepEqual( fetched.details.school, "HFUT" );
+        deepEqual( fetched.details.sports.length, 2 );
+        deepEqual( fetched.confirmed, 1 );
         
         fetched = temp.clean().fetch();
-        same( fetched.name, "" );
-        same( fetched.gender, void 0 );
-        same( fetched.age, void 0 );
-        same( fetched.desc, "" );
-        same( fetched.details.language.length, 0 );
-        same( fetched.details.gender, void 0 );
-        same( fetched.details.school, "" );
-        same( fetched.details.sports.length, 0 );
-        same( fetched.confirmed, void 0 );
+        deepEqual( fetched.name, "" );
+        deepEqual( fetched.gender, void 0 );
+        deepEqual( fetched.age, void 0 );
+        deepEqual( fetched.desc, "" );
+        deepEqual( fetched.details.language.length, 0 );
+        deepEqual( fetched.details.gender, void 0 );
+        deepEqual( fetched.details.school, "" );
+        deepEqual( fetched.details.sports.length, 0 );
+        deepEqual( fetched.confirmed, void 0 );
         
         start();
     }, "text");
-    
-    stop();
 });
 
 function sameIgnoreCase( str1, str2 ){
-    return same( str1.toLowerCase(), str2.toLowerCase() );
+    return deepEqual( str1.toLowerCase(), str2.toLowerCase() );
 }
 
 });

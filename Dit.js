@@ -1,56 +1,87 @@
 (function(){
-
-var Dit = window.Dit = {
+var dit = window.dit = {
     create: function( node, opt ){
         node = parseNode( node );
-        var phs = {},
-            fields = {};
-        scan( node, phs, fields, [] );
-        node.fill = function( data ){
-            fill( phs, fields, data, opt );
-            return node;
-        };
-        node.clean = function(){
-            clean( phs );
-            return node;
-        };
-        node.clone = function(){
-            return Dit.create( node.cloneNode(true), opt );
-        };
-        node.fetch = function(){
-            return fetch( fields );
+        node._opt = opt;
+        node._holders = {};
+        node._fields = {};
+        scan( node, opt, node._holders, node._fields, [] );
+        for( var k in this.proto ){
+            node[k] = this.proto[k];
         }
         return node;
+    },
+    proto: {
+        fill: function( data, append ){
+            hide( this );
+            fill( this._holders, this._fields, data || {}, this._opt, append );
+            return show( this );
+        },
+        append: function( data ){
+            return this.fill( data, true );
+        },
+        clean: function(){
+            hide( this );
+            clean( this._holders );
+            return show( this );
+        },
+        /* clone is not working in IE9 now.*/
+        clone: function(){
+            return this._html ? dit.create(this._html, this._opt) : null;
+        },
+        fetch: function(){
+            return fetch( this._fields );
+        },
+        opt: function( k, v ){
+            opt( this._opt, k, v );
+            return this;
+        }
     }
 },
+    alias = {
+        // imgsrc -> src, using imgsrc to avoid an error request.
+        "imgsrc": "src"
+    },
+    protos = {},
     toString = Object.prototype.toString,
+    join = Array.prototype.join,
     container = document.createElement("body"),
-    regex = /(\$?)\{([\w\d\.]*)\}/ig,
-    protos = {};
+    regex = /(\$?)\{\{\s*([\w\d\.]+)\s*:?\s*([^}]*)\}\}/ig;
 
 function parseNode( node ){
+	var _n = node;
     if( typeof node === "string" ){
         container.innerHTML = node;
-        return container.firstChild;
+
+        _n = container.firstChild;
+        _n._html = node;
+    }else if( node.jquery ){
+        _n = node[0];
     }
-    return node;
+    if( _n && !_n._html ){
+    	_n._html = _n.outerHTML;
+    }
+    return _n;
 }
 
-function fill( phs, fields, data, fns ){
+function fill( phs, fields, data, opt, append ){
     var val, handlers;
     for( var field in phs ){
         val = evaluate( data, field );
-        if( fns && fns[field] !== void 0 ){
-            val = typeof fns[field] === "function" ? fns[field]( val, data ) : fns[field];
+        if( opt && opt[field] !== void 0 ){
+            val = typeof opt[field] === "function" ? opt[field]( val, data ) : opt[field];
         }
-        if( val === phs[field].val ) continue;
+        if( val === void 0 && append ) continue;
+        if( val === void 0 || val === null ) val = "";
+        // below is incorrect, because user action won't change phs[field].val.
+        // OR phs[field].val is a pointer;
+        // if( val === phs[field].val ) continue;
         phs[field].val = val;
         handlers = phs[field].handlers;
         for( var i = 0; i < handlers.length; i++ ){
-            handlers[i].fill( val || "" + val );
+            handlers[i].fill( val );
         }
     }
-    
 }
 
 function clean( phs ){
@@ -64,6 +95,14 @@ function clean( phs ){
     }
 }
 
+function opt(opt, k, v ){
+    if( !k ) return ;
+    if( typeof k === "string" )
+        return opt[k] = v;
+    for( var i in k )
+        opt[i] = k[i];
+}
+
 function fetch( fields ){
     var data = {};
     for( var k in fields ){
@@ -72,7 +111,7 @@ function fetch( fields ){
     return data;
 }
 
-function scan( node, phs, fields, prefix ){
+function scan( node, opt, phs, fields, prefix ){
     if( node.nodeType === 3 ) return scanText( node, phs, prefix );
     if( node.nodeType !== 1 ) return ;
     if( node.getAttribute("bind") ){
@@ -99,7 +138,7 @@ function scan( node, phs, fields, prefix ){
                     t;
                 for( var i = 0, j = 0; i < arr.length; i++ ){
                     t = children[i % num].cloneNode(true);
-                    t = Dit.create(t).fill(arr[i]);
+                    t = dit.create(t, opt).fill(arr[i]);
                     this.node.appendChild( t );
                 }
             },
@@ -120,7 +159,7 @@ function scan( node, phs, fields, prefix ){
     for( var i = 0; i < children.length; i++ ){
         child = children[i];
         if( child.nodeType === 1 ){
-            scan( child, phs, fields, prefix );
+            scan( child, opt, phs, fields, prefix );
         }else if( child.nodeType === 3 ){
             scanText( child, phs, prefix );
         }
@@ -129,30 +168,37 @@ function scan( node, phs, fields, prefix ){
 
 function scanAttr( node, phs, prefix ){
     var attrs = node.attributes;
-    var _phs;
     for( var i = 0; i < attrs.length; i++ ) {
-        var _ori = attrs[i].nodeValue;
-        if( !_ori || typeof _ori !== "string" ) continue;
-        _ori.replace(regex, function( match, has$, field, startIdx ){
+        var _ori = attrs[i].nodeValue, 
+            _phs = [];
+        if( !_ori || attrs[i].name === "_html" || typeof _ori !== "string" ) continue;
+        _ori.replace(regex, function( match, has$, field, exp, startIdx ){
             field = getField( prefix, field );
-            _phs = _phs || [];
-            _phs.push( {f: field, m: match} );
-            var attr = attrs[i].nodeName;
-            var handler = {
+            var ph = {f: field, m: match},
+                attr = attrs[i].nodeName,
+                attr = alias[attr] ? alias[attr] : attr,
+                handler = {
                 fill: function( v ){
-                    var val = this._ori, ph;
+                    var val = this._ori, ph, _tm;
                     for( var i = 0; i < this._phs.length; i++){
                         ph = this._phs[i];
-                        val = val.replace( ph.m, phs[ph.f].val );
+                        _tm = phs[ph.f].val;
+                        if( ph.convert )
+                            _tm = ph.convert( _tm );
+                        val = val.replace( ph.m, _tm );
                     }
                     attr === "class" ? node.className = val : node.setAttribute(attr, val);
                 },
                 clean: function(){
-                    node.removeAttribute( attr );
+                    var val = this._ori.replace(regex, "");
+                    attr === "class" ? node.className = val : node.setAttribute(attr, val);
                 },
                 _ori: _ori,
                 _phs: _phs
             };
+            if( exp ) 
+                ph.convert = convert( field, exp );
+            _phs.push( ph );
             getHandlers(phs, null, field).push( handler );
         });
         _phs = null;
@@ -163,24 +209,49 @@ function scanText( node, phs, prefix ){
     var parent = node.parentNode;
     var value = node.nodeValue;
     var txt, idx = 0;
-    node.nodeValue.replace(regex, function( match, has$, field, startIdx ){
+    node.nodeValue.replace(regex, function( match, has$, field, exp, startIdx ){
         if( txt = value.substring(idx, startIdx) ) parent.insertBefore( textNode(txt), node );
         var dn = textNode( match );
         var handler = {
             fill: function( val ){
-                if( val.jquery ) val = val[0];
-                if( val.nodeType !== 1 || !has$ ) val = textNode( val );
-                parent.replaceChild( val, this._now );
+                if( this.convert ) val = this.convert(val);
+                if( val.jquery ){
+                    val = $.map(val.toArray(), function(it){return it;});
+                };
+                if( val.nodeType !== 1 && !isArray(val) || !has$ ) val = textNode( val );
+                var now = this._now;
+                if( isArray(now) ){
+                    for( var i = 1; i < now.length; i++){
+                        parent.removeChild( now[i] );
+                    }
+                    now = now[0];
+                }
+                if( isArray(val) ){
+                    for( var i = 0; i < val.length; i++){
+                        parent.insertBefore( val[i], now );
+                    }
+                }else if(val){
+                    parent.insertBefore( val, now );
+                }
+                parent.removeChild( now );
                 this._now = val;
             },
             clean: function(){
-                parent.replaceChild( this._empty, this._now );
+                var now = this._now;
+                if( isArray(now) ){
+                    for( var i = 1; i < now.length; i++){
+                        parent.removeChild( now[i] );
+                    }
+                    now = now[0];
+                }
+                parent.replaceChild( this._empty, now );
                 this._now = this._empty;
             },
             _ori: dn,
             _now: dn,
             _empty: textNode("")
         };
+        if( exp ) handler.convert = convert( field, exp );
         getHandlers( phs, prefix, field ).push( handler );
         parent.insertBefore( dn, node );
         idx = startIdx + match.length;
@@ -191,10 +262,12 @@ function scanText( node, phs, prefix ){
 
 function scanFormField( node, phs, fields, prefix ){
     var name = node.name,
+        // type = node.getAttribute("type"),
         type = node.type,
         isNum = node.getAttribute("number"),
         key = getField( prefix, name ),
         handler = fields[key];
+    // console.log(name + ': node.type = ' + node.type + ', node.getAttribute("type") = ' + node.getAttribute("type"))
     if( !handler ){
          handler = fields[key] = new (protos[type] || protos.normal)();
          getHandlers( phs, key ).push( handler );
@@ -225,10 +298,11 @@ protos.radio = function(){};
 protos.radio.prototype = {
     fill: function( val ){
         var nodes = this.nodes,
-            len = nodes.length;
+            len = nodes.length,
+            v = "" + val;
         for( var i = 0; i < len; i++ ){
             nodes[i].checked = false;
-            if( nodes[i].value === "" + val ){
+            if( nodes[i].value === v ){
                 nodes[i].checked = true;
             }
         }
@@ -293,7 +367,7 @@ protos["select-multiple"].prototype = {
             options[i].setAttribute("selected", "");
             options[i].selected = false;
             for( var j = 0; val && j < val.length; j++ ){
-                if( options[i].nodeType === 1 && options[i].value === val[j] ) {
+                if( options[i].nodeType === 1 && options[i].value === val[j] ){
                     options[i].setAttribute("selected", "true"); // IE
                     options[i].selected = true; // FF and other
                 }
@@ -322,6 +396,10 @@ protos["select-multiple"].prototype = {
         }
         return arr;
     }
+}
+
+function convert( field, exp ){
+    return new Function( 'v', 'return ' + exp );
 }
 
 function toNumber( val, isNum ){
@@ -355,6 +433,16 @@ function textNode( text ){
 
 function isArray( obj ){
     return obj && toString.call(obj) === "[object Array]";
+}
+
+function hide( node ){
+    node.oldCssText = node.style.cssText;
+    node.style.display = "none";
+    return node;
+}
+function show( node ){
+    node.style.cssText = node.oldCssText;
+    return node;
 }
 
 function evaluate( ctx, exp ){
