@@ -52,7 +52,6 @@ function parseNode( node ){
 	var _n = node;
     if( typeof node === "string" ){
         container.innerHTML = node;
-
         _n = container.firstChild;
         _n._html = node;
     }else if( node.jquery ){
