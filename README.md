@@ -1,4 +1,7 @@
 ﻿**﻿Dit，一个简单的模板引擎，根据已经存在的DOM节点，或者是任何合法的HTML字符串就可以构造出一个模板，仅仅是在需要的地方（文本节点或者属性）中引入{{}}或者${{}}，所以有着较低的侵入性。**  
+**与一般的模板引擎最大的区别在于，它首先将html解析成DOM节点（如果已经是DOM节点或者jQuery对象，则跳过这一步），并插入DOM树，并等待填充数据。适用于不停地更新某一块数据。**  
+**缺点也很明显，不适合在服务器端使用。作者不推荐这种方式，更推荐把服务器当做数据库使用，逻辑尽可能移至前端。**  
+
 # API：  
 **Template.create( node, opt )**  
 @param node: （符合HTML语法的）字符串/DOM节点，必选。  
@@ -51,5 +54,5 @@ archievements: function( archs, data ){
 &nbsp;&nbsp;&nbsp;&nbsp;if( archs.length === 0 ) fragment.appendChild( $("&lt;div&gt;", {"text": "No Archievement."})[0] );  
 &nbsp;&nbsp;&nbsp;&nbsp;return fragment;  
 }  
-**支持{}和${}两种占位符格式**，其中，如果后者用于文本节点中，则可以作为DOM节点（jquery也可以）的占位符。如以下所示：  
+**支持{{}}和${{}}两种占位符格式**，其中，如果后者用于文本节点中，则可以作为DOM节点（jquery也可以）的占位符。如以下所示：  
 &lt;div&gt;Avatar: ${{img}}&lt;/div&gt;  ---&gt;fill( {img: $("&lt;img&gt;")} ) ---&gt; &lt;div&gt;Avatar: &lt;img&gt;&lt;/div&gt;
