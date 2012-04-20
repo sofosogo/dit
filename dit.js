@@ -77,6 +77,7 @@ function fill( phs, fields, data, opt, append ){
         if( val === void 0 || val === null ) val = "";
         // below is incorrect, because user action won't change phs[field].val.
         // OR phs[field].val is a pointer;
+        // OR input etc. user can change its value manually.
         // if( val === phs[field].val ) continue;
         phs[field].val = val;
         handlers = phs[field].handlers;
@@ -153,12 +154,14 @@ function scan( node, opt, phs, fields, prefix ){
         return;
     }
     // node.childNodes changed by scanText function.
+    // fuck IE, we cannnot use the simpliest way below:
+    // var children = Array.prototype.slice.call( node.childNodes );
     var children = []; 
-    for( var i = 0; i < node.childNodes.length; i++ ){
+    for( var i = 0, len = node.childNodes.length; i < len; i++ ){
         children.push( node.childNodes[i] );
     }
     var child;
-    for( var i = 0; i < children.length; i++ ){
+    for( var i = 0, len = children.length; i < len; i++ ){
         child = children[i];
         if( child.nodeType === 1 ){
             scan( child, opt, phs, fields, prefix );
